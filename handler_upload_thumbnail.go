@@ -28,10 +28,21 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-
 	fmt.Println("uploading thumbnail for video", videoID, "by user", userID)
 
 	// TODO: implement the upload here
+
+	const maxMemory int = 10 << 20
+
+	r.ParseMultipartForm(maxMemory)
+
+	file, header, err := r.FormFile("thumbnail")
+
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "unable to parse form file", err)
+	}
+
+	defer file.Close()
 
 	respondWithJSON(w, http.StatusOK, struct{}{})
 }

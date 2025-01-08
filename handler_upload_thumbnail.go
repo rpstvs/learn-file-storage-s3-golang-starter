@@ -32,7 +32,7 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 
 	// TODO: implement the upload here
 
-	const maxMemory int = 10 << 20
+	const maxMemory int64 = 10 << 20
 
 	r.ParseMultipartForm(maxMemory)
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
@@ -49,6 +50,25 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 
 	if mediaType == "" {
 		respondWithError(w, http.StatusBadRequest, "Missing Content-type for thumbnail", nil)
+		return
+	}
+
+	data, err := io.ReadAll(file)
+
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Couldnt read file", err)
+		return
+	}
+
+	video, err := cfg.db.GetVideo(videoID)
+
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Couldnt find video", err)
+		return
+	}
+
+	if video.UserID != userID {
+		respondWithError(w, http.StatusUnauthorized, "Not the owner of the vid", nil)
 		return
 	}
 

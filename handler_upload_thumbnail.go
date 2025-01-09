@@ -72,5 +72,20 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, struct{}{})
+	videoThumbnails[videoID] = thumbnail{data: data, mediaType: mediaType}
+
+	url := fmt.Sprintf("http://localhost:%s/api/thumbnails/%s", cfg.port, videoID)
+
+	video.ThumbnailURL = &url
+
+	err = cfg.db.UpdateVideo(video)
+
+	if err != nil {
+		delete(videoThumbnails, videoID)
+
+		respondWithError(w, http.StatusBadRequest, "couldnt update video", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, video)
 }

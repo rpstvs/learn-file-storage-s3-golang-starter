@@ -1,10 +1,10 @@
 package main
 
 import (
-	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -54,11 +54,20 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	data, err := io.ReadAll(file)
+	assetPath := getAssetPath(videoID, mediaType)
+	assetdiskPath := cfg.getAssetDiskPath(assetPath)
+
+	dst, err := os.Create(assetdiskPath)
 
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Couldnt read file", err)
+		respondWithError(w, http.StatusInternalServerError, "unable to create file on server", err)
 		return
+	}
+
+	defer dst.Close()
+
+	if _, err = io.Copy(dst, file); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "couldnt copy contents", err)
 	}
 
 	video, err := cfg.db.GetVideo(videoID)
@@ -73,9 +82,8 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	encoded := base64.StdEncoding.EncodeToString(data)
-	base64DataUrl := fmt.Sprintf("data:%s;base64,%s", mediaType, encoded)
-	video.ThumbnailURL = &base64DataUrl
+	url := cfg.getAssetUrl(assetPath)
+	video.ThumbnailURL = &url
 
 	err = cfg.db.UpdateVideo(video)
 

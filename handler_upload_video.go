@@ -1,7 +1,9 @@
 package main
 
 import (
+	"mime"
 	"net/http"
+	"os"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -52,5 +54,27 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	defer file.Close()
+
+	mediaType, params, err := mime.ParseMediaType()
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "couldnt parse media type", err)
+		return
+	}
+
+	if mediaType != "video/mp4" {
+		respondWithError(w, http.StatusBadRequest, "not video type", nil)
+		return
+	}
+
+	tmpfile, err := os.CreateTemp("", "tubely-upload.mp4")
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "couldnt create temp file", err)
+		return
+	}
+
+	defer os.Remove("tubely-upload.mp4")
+	defer tmpfile.Close()
 
 }

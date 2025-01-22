@@ -1,17 +1,20 @@
 package main
 
 import (
+	"io"
 	"mime"
 	"net/http"
 	"os"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
 )
 
 func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request) {
 
-	closer := http.MaxBytesReader(w, r.Body, 1<<30)
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<30)
 
 	videoIDString := r.PathValue("videoID")
 	vidoID, err := uuid.Parse(videoIDString)
@@ -47,7 +50,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	file, header, err := r.FormFile("video")
+	file, handler, err := r.FormFile("video")
 
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "unable to parse", err)
@@ -55,7 +58,7 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 	}
 	defer file.Close()
 
-	mediaType, params, err := mime.ParseMediaType()
+	mediaType, _, err := mime.ParseMediaType(handler.Header.Get("Content-Type"))
 
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "couldnt parse media type", err)
@@ -74,7 +77,26 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	defer os.Remove("tubely-upload.mp4")
+	defer os.Remove(tmpfile.Name())
 	defer tmpfile.Close()
+
+	if _, err := io.Copy(tmpfile, file); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not copy the file", err)
+		return
+	}
+
+	_, err = tmpfile.Seek(0, io.SeekStart)
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "couldnt get to the beginning of the file", err)
+		return
+	}
+	key := getAssetPath(mediaType)
+	cfg.s3Client.PutObject(r.Context(), &s3.PutObjectInput{
+		Bucket:      aws.String(cfg.s3Bucket),
+		Key:         aws.String(key),
+		Body:        tmpfile,
+		ContentType: aws.String(mediaType),
+	})
 
 }

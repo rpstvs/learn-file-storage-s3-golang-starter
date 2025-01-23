@@ -92,11 +92,28 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	key := getAssetPath(mediaType)
-	cfg.s3Client.PutObject(r.Context(), &s3.PutObjectInput{
+	_, err = cfg.s3Client.PutObject(r.Context(), &s3.PutObjectInput{
 		Bucket:      aws.String(cfg.s3Bucket),
 		Key:         aws.String(key),
 		Body:        tmpfile,
 		ContentType: aws.String(mediaType),
 	})
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "error uploading file to s3", err)
+		return
+	}
+
+	url := cfg.getObjectUrl(key)
+
+	videoData.VideoURL = &url
+	err = cfg.db.UpdateVideo(videoData)
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "couldnt update video", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, videoData)
 
 }

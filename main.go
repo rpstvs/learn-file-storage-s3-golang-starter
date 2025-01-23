@@ -19,13 +19,13 @@ type apiConfig struct {
 	db               database.Client
 	jwtSecret        string
 	platform         string
+	s3Client         *s3.Client
 	filepathRoot     string
 	assetsRoot       string
 	s3Bucket         string
 	s3Region         string
 	s3CfDistribution string
 	port             string
-	s3Client         *s3.Client
 }
 
 type thumbnail struct {
@@ -89,6 +89,10 @@ func main() {
 	}
 
 	awsConfig, err := config.LoadDefaultConfig(context.Background())
+
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	s3Client := s3.NewFromConfig(awsConfig)
 

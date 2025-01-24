@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -88,7 +89,7 @@ func main() {
 		log.Fatal("PORT environment variable is not set")
 	}
 
-	awsConfig, err := config.LoadDefaultConfig(context.Background())
+	awsConfig, err := config.LoadDefaultConfig(context.Background(), config.WithRegion("eu-north-1"))
 
 	if err != nil {
 		log.Fatal(err)
@@ -100,14 +101,16 @@ func main() {
 		db:               db,
 		jwtSecret:        jwtSecret,
 		platform:         platform,
+		s3Client:         s3Client,
 		filepathRoot:     filepathRoot,
 		assetsRoot:       assetsRoot,
 		s3Bucket:         s3Bucket,
 		s3Region:         s3Region,
 		s3CfDistribution: s3CfDistribution,
 		port:             port,
-		s3Client:         s3Client,
 	}
+
+	fmt.Println(s3Region, s3Bucket)
 
 	err = cfg.ensureAssetsDir()
 	if err != nil {

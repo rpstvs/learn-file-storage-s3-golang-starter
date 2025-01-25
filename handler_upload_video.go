@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -96,7 +97,26 @@ func (cfg *apiConfig) handlerUploadVideo(w http.ResponseWriter, r *http.Request)
 		respondWithError(w, http.StatusInternalServerError, "couldnt get to the beginning of the file", err)
 		return
 	}
+	directory := ""
+	aspectRatio, err := getVideoAspectRatio(tmpfile.Name())
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "couldnt get aspect ratio", err)
+		return
+	}
+
+	switch aspectRatio {
+	case "16:9":
+		directory = "landscape"
+	case "9:16":
+		directory = "portrait"
+	default:
+		directory = "other"
+	}
+
 	key := getAssetPath(mediaType)
+	key = filepath.Join(directory, key)
+
 	_, err = cfg.s3Client.PutObject(r.Context(), &s3.PutObjectInput{
 		Bucket:      aws.String(cfg.s3Bucket),
 		Key:         aws.String(key),
@@ -141,7 +161,7 @@ func getVideoAspectRatio(filePath string) (string, error) {
 		} `json:"streams"`
 	}
 
-	if err := json.Unmarshal(stdout.Bytes(), output); err != nil {
+	if err := json.Unmarshal(stdout.Bytes(), &output); err != nil {
 		return "", fmt.Errorf("could not parse output")
 	}
 
@@ -159,4 +179,29 @@ func getVideoAspectRatio(filePath string) (string, error) {
 	}
 
 	return "other", nil
+}
+
+func processVideoForFastStart(filePath string) (string, error) {
+	processedFilePath := fmt.Sprintf("%s.processing", filePath)
+	execCmd := exec.Command("ffmpeg", "-i", filePath, "-c", "copy", "-movflags", "faststart", "-f", "mp4")
+	var stderr bytes.Buffer
+	execCmd.Stderr = &stderr
+
+	if err := execCmd.Run(); err != nil {
+
+		return "", errors.New("command run failed for fast start")
+	}
+
+	fileInfo, err := os.Stat(processedFilePath)
+
+	if err != nil {
+		return "", fmt.Errorf("could not stat processed file")
+	}
+
+	if fileInfo.Size() == 0 {
+		return "", fmt.Errorf("processedfile is empty")
+	}
+
+	return processedFilePath, nil
+
 }
